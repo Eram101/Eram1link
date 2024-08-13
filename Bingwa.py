@@ -11,24 +11,24 @@ OFFER, DURATION, SELECT_OFFER, PHONE = range(4)
 # Define offers globally
 offers = {
     'data': {
-        '3 hours': {'id': 1, 'details': ['1.5GB @Ksh 50']},
-        '7 days': {'id': 2, 'details': ['350MB @Ksh 49', '2.5GB @Ksh 295', '6GB @Ksh 699']},
-        '1 hour': {'id': 3, 'details': ['1GB @Ksh 19']},
-        '24 hours': {'id': 4, 'details': ['250MB @Ksh 18', '1GB @Ksh 99']},
-        'till midnight': {'id': 5, 'details': ['1.25GB @Ksh 55']}
+        '3 hours': {'details': ['1.5GB @Ksh 50']},
+        '7 days': {'details': ['350MB @Ksh 49', '2.5GB @Ksh 295', '6GB @Ksh 699']},
+        '1 hour': {'details': ['1GB @Ksh 19']},
+        '24 hours': {'details': ['250MB @Ksh 18', '1GB @Ksh 99']},
+        'till midnight': {'details': ['1.25GB @Ksh 55']}
     },
     'minutes': {
-        '1 hour': {'id': 6, 'details': ['1GB @Ksh 19']},
-        '48 hours': {'id': 7, 'details': ['400 minutes @Ksh 50']}
+        '1 hour': {'details': ['1GB @Ksh 19']},
+        '48 hours': {'details': ['400 minutes @Ksh 50']}
     },
     'combined': {
-        '30 days': {'id': 8, 'details': ['8GB+400 minutes @Ksh 1000']},
-        '7 days': {'id': 9, 'details': ['2GB+100 minutes @Ksh 300']}
+        '30 days': {'details': ['8GB+400 minutes @Ksh 1000']},
+        '7 days': {'details': ['2GB+100 minutes @Ksh 300']}
     },
     'sms': {
-        '1 day': {'id': 10, 'details': ['20 SMS @Ksh 5', '200 SMS @Ksh 10']},
-        '7 days': {'id': 11, 'details': ['1000 SMS @Ksh 29']},
-        '30 days': {'id': 12, 'details': ['1500 SMS @Ksh 96', '3500 SMS @Ksh 198']}
+        '1 day': {'details': ['20 SMS @Ksh 5', '200 SMS @Ksh 10']},
+        '7 days': {'details': ['1000 SMS @Ksh 29']},
+        '30 days': {'details': ['1500 SMS @Ksh 96', '3500 SMS @Ksh 198']}
     }
 }
 
@@ -48,7 +48,7 @@ def offer_selection(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     query.answer()
 
-    if query.data == 'cancel':
+    if (query.data == 'cancel'):
         query.edit_message_text(text="Thank you! The session has been canceled.")
         return ConversationHandler.END
 
@@ -74,7 +74,7 @@ def duration_selection(update: Update, context: CallbackContext) -> int:
 
     selected_offers = offers.get(offer_type, {}).get(duration, {'details': ['Offer not available']})
 
-    keyboard = [[InlineKeyboardButton(f"{detail} (ID: {offers[offer_type][duration]['id']})", callback_data=f'{offer_type}:{duration}:{offers[offer_type][duration]["id"]}')] for detail in selected_offers['details']]
+    keyboard = [[InlineKeyboardButton(detail, callback_data=f'{offer_type}:{duration}:{index}')] for index, detail in enumerate(selected_offers['details'])]
     reply_markup = InlineKeyboardMarkup(keyboard)
     query.edit_message_text(text=f'You selected {duration}. Please select an offer:', reply_markup=reply_markup)
     return SELECT_OFFER
@@ -83,12 +83,12 @@ def option_selection(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     query.answer()
 
-    offer_type, duration, offer_id = query.data.split(':')
+    offer_type, duration, selected_index = query.data.split(':')
     context.user_data['offer_type'] = offer_type
     context.user_data['duration'] = duration
-    context.user_data['offer_id'] = offer_id
+    context.user_data['selected_index'] = selected_index
 
-    selected_offer = query.message.text.split('\n')[0].replace('You selected the offer: ', '')
+    selected_offer = offers[offer_type][duration]['details'][int(selected_index)]
     query.edit_message_text(text=f'You selected the offer: {selected_offer}')
     query.message.reply_text('Please enter your phone number:')
     return PHONE
@@ -99,8 +99,8 @@ def phone_number(update: Update, context: CallbackContext) -> int:
 
     offer_type = context.user_data['offer_type']
     duration = context.user_data['duration']
-    offer_id = context.user_data['offer_id']
-    selected_offer = [o for o in offers[offer_type][duration]['details'] if str(offers[offer_type][duration]['id']) == offer_id][0]
+    selected_index = context.user_data['selected_index']
+    selected_offer = offers[offer_type][duration]['details'][int(selected_index)]
 
     update.message.reply_text(f'Thank you! Here is your summary:\n'
                               f'Offer Type: {offer_type}\n'
