@@ -108,7 +108,7 @@ def phone_number(update: Update, context: CallbackContext) -> int:
     money = selected_offer.split('@Ksh ')[1].split()[0]
 
     # Send request to stkpush.php with the filled-in $money and $phone
-    url = "http://localhost/stkpush.php"  # Assuming you're running the script locally
+    url = "http://localhost/workspace/stkpush.php"  # Assuming you're running the script locally
     data = {
         'money': money,
         'phone': phone_number
