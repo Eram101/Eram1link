@@ -9,11 +9,11 @@ $BusinessShortCode = '174379';
 $Timestamp = date('YmdHis');
 // ENCRIPT  DATA TO GET PASSWORD
 $Password = base64_encode($BusinessShortCode . $passkey . $Timestamp);
-$phone = '';//phone number to receive the stk push
+$phone = '254727856009';//phone number to receive the stk push
 $money = '1';
 $PartyA = $phone;
-$PartyB = '254708374149';
-$AccountReference = 'UMESKIA SOFTWARES';
+$PartyB = '254727856009';
+$AccountReference = 'ERAMLINK NETWORKS';
 $TransactionDesc = 'stkpush test';
 $Amount = $money;
 $stkpushheader = ['Content-Type:application/json', 'Authorization:Bearer ' . $access_token];
