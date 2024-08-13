@@ -11,24 +11,24 @@ OFFER, DURATION, SELECT_OFFER, PHONE = range(4)
 # Define offers globally
 offers = {
     'data': {
-        '3 hours': {'details': ['1.5GB @Ksh 50']},
+        '24 hours': {'details': ['250MB @Ksh 18', '1GB @Ksh 99']},
         '7 days': {'details': ['350MB @Ksh 49', '2.5GB @Ksh 295', '6GB @Ksh 699']},
         '1 hour': {'details': ['1GB @Ksh 19']},
-        '24 hours': {'details': ['250MB @Ksh 18', '1GB @Ksh 99']},
-        'till midnight': {'details': ['1.25GB @Ksh 55']}
+        '30 days': {'details': ['1.25GB @Ksh 250', '10GB @Ksh 998']},
+        'till midnight': {'details': ['1.25GB @Ksh 50']}
     },
     'minutes': {
-        '1 hour': {'details': ['1GB @Ksh 19']},
-        '48 hours': {'details': ['400 minutes @Ksh 50']}
+        'till midnight': {'details': ['50 minutes @Ksh 46']},
+        '7 days': {'details': ['200 minutes @Ksh 247']},
+        '30 days': {'details': ['300 minutes @Ksh 500', '800 minutes @Ksh 1000']}
     },
     'combined': {
-        '30 days': {'details': ['8GB+400 minutes @Ksh 1000']},
-        '7 days': {'details': ['2GB+100 minutes @Ksh 300']}
+        '30 days': {'details': ['8GB + 400 minutes @Ksh 999']}
     },
     'sms': {
-        '1 day': {'details': ['20 SMS @Ksh 5', '200 SMS @Ksh 10']},
+        '24 hours': {'details': ['20 SMS @Ksh 5', '200 SMS @Ksh 10']},
         '7 days': {'details': ['1000 SMS @Ksh 29']},
-        '30 days': {'details': ['1500 SMS @Ksh 96', '3500 SMS @Ksh 198']}
+        '30 days': {'details': ['800 SMS @Ksh 1000']}
     }
 }
 
@@ -48,16 +48,16 @@ def offer_selection(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     query.answer()
 
-    if (query.data == 'cancel'):
+    if query.data == 'cancel':
         query.edit_message_text(text="Thank you! The session has been canceled.")
         return ConversationHandler.END
 
     context.user_data['offer_type'] = query.data
     options = {
-        'data': ['3 hours', '7 days', '1 hour', '24 hours', 'till midnight'],
-        'minutes': ['1 hour', '48 hours'],
-        'combined': ['30 days', '7 days'],
-        'sms': ['1 day', '7 days', '30 days'],
+        'data': ['24 hours', '7 days', '1 hour', '30 days', 'till midnight'],
+        'minutes': ['till midnight', '7 days', '30 days'],
+        'combined': ['30 days'],
+        'sms': ['24 hours', '7 days', '30 days'],
     }
     keyboard = [[InlineKeyboardButton(option, callback_data=f'{query.data}:{option}')] for option in options.get(query.data, [])]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -93,6 +93,8 @@ def option_selection(update: Update, context: CallbackContext) -> int:
     query.message.reply_text('Please enter your phone number:')
     return PHONE
 
+import requests
+
 def phone_number(update: Update, context: CallbackContext) -> int:
     phone_number = update.message.text
     context.user_data['phone_number'] = phone_number
@@ -102,11 +104,23 @@ def phone_number(update: Update, context: CallbackContext) -> int:
     selected_index = context.user_data['selected_index']
     selected_offer = offers[offer_type][duration]['details'][int(selected_index)]
 
-    update.message.reply_text(f'Thank you! Here is your summary:\n'
-                              f'Offer Type: {offer_type}\n'
-                              f'Duration: {duration}\n'
-                              f'Offer: {selected_offer}\n'
-                              f'Phone Number: {phone_number}')
+    # Extract the amount from the selected offer (assumes format like '1GB @Ksh 99')
+    money = selected_offer.split('@Ksh ')[1].split()[0]
+
+    # Send request to stkpush.php with the filled-in $money and $phone
+    url = "http://localhost/darajaapi/stkpush.php"  # Assuming you're running the script locally
+    data = {
+        'money': money,
+        'phone': phone_number
+    }
+    response = requests.post(url, data=data)
+
+    # Provide feedback to the user
+    if response.status_code == 200:
+        update.message.reply_text(f'Thank you! Your payment request has been sent. Please check your phone to complete the payment.')
+    else:
+        update.message.reply_text(f'Sorry, there was an error processing your payment. Please try again later.')
+
     return ConversationHandler.END
 
 def cancel(update: Update, context: CallbackContext) -> int:
