@@ -3,9 +3,13 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackContext, CallbackQueryHandler, MessageHandler, Filters, ConversationHandler
 import requests
+from dotenv import load_dotenv
 
-# Hardcoded bot token for testing purposes
-BOT_TOKEN = '6767053413:AAEkzi5j5sitNg5sraQ54PELtsbx6czR8bY'
+# Load environment variables from .env file
+load_dotenv()
+
+# Retrieve the bot token from the .env file
+BOT_TOKEN = os.getenv('BOT_TOKEN')
 updater = Updater(token=BOT_TOKEN, use_context=True)
 dispatcher = updater.dispatcher
 
