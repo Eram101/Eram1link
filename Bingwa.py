@@ -1,44 +1,24 @@
 import os
+import json
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackContext, CallbackQueryHandler, MessageHandler, Filters, ConversationHandler
 import requests
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
-
-# Retrieve the bot token from the .env file
 BOT_TOKEN = os.getenv('BOT_TOKEN')
+
+# Load offers from JSON file
+with open('offers.json', 'r') as f:
+    offers = json.load(f)
+
 updater = Updater(token=BOT_TOKEN, use_context=True)
 dispatcher = updater.dispatcher
 
 # Define states for ConversationHandler
 OFFER, DURATION, SELECT_OFFER, PHONE = range(4)
-
-# Define offers globally
-offers = {
-    'data': {
-        '24 hours': {'details': ['250MB @Ksh 18', '1GB @Ksh 99']},
-        '7 days': {'details': ['350MB @Ksh 49', '2.5GB @Ksh 295', '6GB @Ksh 699']},
-        '1 hour': {'details': ['1GB @Ksh 19']},
-        '30 days': {'details': ['1.25GB @Ksh 250', '10GB @Ksh 998']},
-        'till midnight': {'details': ['1.25GB @Ksh 50']}
-    },
-    'minutes': {
-        'till midnight': {'details': ['50 minutes @Ksh 46']},
-        '7 days': {'details': ['200 minutes @Ksh 247']},
-        '30 days': {'details': ['300 minutes @Ksh 500', '800 minutes @Ksh 1000']}
-    },
-    'combined': {
-        '30 days': {'details': ['8GB + 400 minutes @Ksh 999']}
-    },
-    'sms': {
-        '24 hours': {'details': ['20 SMS @Ksh 5', '200 SMS @Ksh 10']},
-        '7 days': {'details': ['1000 SMS @Ksh 29']},
-        '30 days': {'details': ['800 SMS @Ksh 1000']}
-    }
-}
 
 def start(update: Update, context: CallbackContext) -> int:
     keyboard = [
