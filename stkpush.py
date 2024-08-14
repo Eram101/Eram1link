@@ -15,9 +15,14 @@ consumer_secret = os.getenv("MPESA_CONSUMER_SECRET")
 business_shortcode = os.getenv("MPESA_SHORTCODE")
 lipa_na_mpesa_passkey = os.getenv("MPESA_PASSKEY")
 callback_url = os.getenv("MPESA_CALLBACK_URL")
+environment = os.getenv("MPESA_ENVIRONMENT")  # 'live' or 'sandbox'
+stkname = os.getenv('STK_NAME')
+
+# Define base URL based on environment
+base_url = 'https://api.safaricom.co.ke' if environment == 'live' else 'https://sandbox.safaricom.co.ke'
 
 # Access token URL
-access_token_url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
+access_token_url = f'{base_url}/oauth/v1/generate?grant_type=client_credentials'
 
 def get_access_token():
     try:
@@ -41,21 +46,21 @@ def process_stkpush(amount, phone_number):
 
     # Request data
     data = {
-        'BusinessShortCode': business_shortcode,
+        'BusinessShortCode': business_shortcode,  # Your M-Pesa till number
         'Password': password,
         'Timestamp': timestamp,
-        'TransactionType': 'CustomerPayBillOnline',
+        'TransactionType': 'CustomerPayBillOnline',  # Use 'CustomerPayBillOnline' for paybill/till numbers
         'Amount': amount,
         'PartyA': phone_number,
-        'PartyB': business_shortcode,
+        'PartyB': business_shortcode,  # Your M-Pesa till number
         'PhoneNumber': phone_number,
         'CallBackURL': callback_url,
-        'AccountReference': 'BingwaSokoni',
+        'AccountReference': stkname,
         'TransactionDesc': 'Bingwa Sokoni payment'
     }
 
-    # Lipa na Mpesa Online API endpoint
-    stk_push_url = 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest'
+    # STK Push URL
+    stk_push_url = f'{base_url}/mpesa/stkpush/v1/processrequest'
 
     # Headers
     headers = {
@@ -71,10 +76,3 @@ def process_stkpush(amount, phone_number):
     except requests.exceptions.RequestException as e:
         print(f"Error sending STK push request: {e}")
         return {"ResponseCode": "1", "ResponseDescription": "Failed to send STK push request"}
-
-if __name__ == "__main__":
-    # Example usage
-    phone_number = input("Enter phone number: ")
-    amount = input("Enter amount: ")
-    response = process_stkpush(amount, phone_number)
-    print(response)

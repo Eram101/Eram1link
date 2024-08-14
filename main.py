@@ -12,6 +12,7 @@ from query import query_payment_status  # Updated function name
 # Load environment variables
 load_dotenv()
 BOT_TOKEN = os.getenv('BOT_TOKEN')
+MPESA_SHORTCODE = os.getenv('MPESA_SHORTCODE')
 
 # Load offers from JSON file
 with open('offers.json', 'r') as f:
@@ -85,6 +86,7 @@ def option_selection(update: Update, context: CallbackContext) -> int:
     context.user_data['selected_index'] = selected_index
 
     selected_offer = offers[offer_type][duration]['details'][int(selected_index)]
+    context.user_data['selected_offer'] = selected_offer
     query.edit_message_text(text=f'You selected the offer: {selected_offer}')
     query.message.reply_text('Please enter your phone number in this format\n 254xxxxxxxxxx:')
     return PHONE
@@ -96,7 +98,7 @@ def phone_number(update: Update, context: CallbackContext) -> int:
     offer_type = context.user_data['offer_type']
     duration = context.user_data['duration']
     selected_index = context.user_data['selected_index']
-    selected_offer = offers[offer_type][duration]['details'][int(selected_index)]
+    selected_offer = context.user_data['selected_offer']
 
     # Extract the amount from the selected offer
     money = selected_offer.split('@Ksh ')[1].split()[0]
@@ -115,7 +117,11 @@ def phone_number(update: Update, context: CallbackContext) -> int:
             25, 
             context={
                 'chat_id': update.message.chat_id, 
-                'CheckoutRequestID': CheckoutRequestID
+                'CheckoutRequestID': CheckoutRequestID,
+                'offer_type': offer_type,
+                'duration': duration,
+                'selected_offer': selected_offer,
+                'phone_number': phone_number,
             }, 
             name=str(update.message.chat_id)
         )
@@ -127,6 +133,10 @@ def phone_number(update: Update, context: CallbackContext) -> int:
 def check_payment_status(context: CallbackContext):
     chat_id = context.job.context['chat_id']
     CheckoutRequestID = context.job.context['CheckoutRequestID']
+    offer_type = context.job.context['offer_type']
+    duration = context.job.context['duration']
+    selected_offer = context.job.context['selected_offer']
+    phone_number = context.job.context['phone_number']
 
     if not CheckoutRequestID:
         context.bot.send_message(chat_id=chat_id, text="No payment to check.")
@@ -141,9 +151,20 @@ def check_payment_status(context: CallbackContext):
     result_code = response_data.get("ResultCode")
 
     if result_code == '0':
-        context.bot.send_message(chat_id=chat_id, text="Payment successful!")
+        context.bot.send_message(
+            chat_id=chat_id, 
+            text=(
+                f"Payment successful!\n"
+                f"Package: {selected_offer}\n"
+                f"Duration: {duration}\n"
+                f"Phone Number: {phone_number}\n"
+                f"Use Till {MPESA_SHORTCODE} for offline transactions\n"
+                f"======================\n"
+                f"Thank you!"
+            )
+        )
     elif result_code == '1032':
-        context.bot.send_message(chat_id= chat_id, text="Transaction canceled by user.")
+        context.bot.send_message(chat_id=chat_id, text="Transaction canceled by user.")
     elif result_code == '1037':
         context.bot.send_message(chat_id=chat_id, text="Transaction timed out.")
     else:

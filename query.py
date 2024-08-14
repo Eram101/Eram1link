@@ -13,8 +13,14 @@ consumer_secret = os.getenv("MPESA_CONSUMER_SECRET")
 business_shortcode = os.getenv("MPESA_SHORTCODE")
 lipa_na_mpesa_passkey = os.getenv("MPESA_PASSKEY")
 
+# Get environment setting
+environment = os.getenv("MPESA_ENVIRONMENT")  # 'live' or 'sandbox'
+
+# Define base URL based on environment
+base_url = 'https://api.safaricom.co.ke' if environment == 'live' else 'https://sandbox.safaricom.co.ke'
+
 def get_access_token():
-    access_token_url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
+    access_token_url = f'{base_url}/oauth/v1/generate?grant_type=client_credentials'
     try:
         response = requests.get(access_token_url, auth=(consumer_key, consumer_secret))
         response.raise_for_status()
@@ -43,7 +49,7 @@ def query_payment_status(checkout_request_id):
     }
 
     # Transaction status API URL
-    api_url = 'https://sandbox.safaricom.co.ke/mpesa/stkpushquery/v1/query'
+    api_url = f'{base_url}/mpesa/stkpushquery/v1/query'
 
     # Headers
     headers = {
