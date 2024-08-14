@@ -18,7 +18,7 @@ $phone = $_POST['phone'];
 $money = $_POST['money'];
 
 $PartyA = $phone;
-$PartyB = '254711164093';
+$PartyB = $_POST['phone'];
 $AccountReference = 'ERAMLINK NETWORKS';
 $TransactionDesc = 'stkpush test';
 $Amount = $money;

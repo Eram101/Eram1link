@@ -1,8 +1,11 @@
+import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackContext, CallbackQueryHandler, MessageHandler, Filters, ConversationHandler
+import requests
 
-# Replace 'YOUR_BOT_TOKEN' with your actual bot token
-updater = Updater(token='6767053413:AAEkzi5j5sitNg5sraQ54PELtsbx6czR8bY', use_context=True)
+# Hardcoded bot token for testing purposes
+BOT_TOKEN = '6767053413:AAEkzi5j5sitNg5sraQ54PELtsbx6czR8bY'
+updater = Updater(token=BOT_TOKEN, use_context=True)
 dispatcher = updater.dispatcher
 
 # Define states for ConversationHandler
@@ -41,7 +44,12 @@ def start(update: Update, context: CallbackContext) -> int:
         [InlineKeyboardButton("Cancel", callback_data='cancel')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text('Hello! Welcome to Bingwa Sokoni Offers.\nNote that this can only be purchased once a day.\nWhich offer would you like?', reply_markup=reply_markup)
+    update.message.reply_text(
+        'Hello! Welcome to Bingwa Sokoni Offers.\n'
+        'Note that this can only be purchased once a day.\n'
+        'Which offer would you like?', 
+        reply_markup=reply_markup
+    )
     return OFFER
 
 def offer_selection(update: Update, context: CallbackContext) -> int:
@@ -93,8 +101,6 @@ def option_selection(update: Update, context: CallbackContext) -> int:
     query.message.reply_text('Please enter your phone number in this format\n 254xxxxxxxxxx:')
     return PHONE
 
-import requests
-
 def phone_number(update: Update, context: CallbackContext) -> int:
     phone_number = update.message.text
     context.user_data['phone_number'] = phone_number
@@ -108,7 +114,7 @@ def phone_number(update: Update, context: CallbackContext) -> int:
     money = selected_offer.split('@Ksh ')[1].split()[0]
 
     # Send request to stkpush.php with the filled-in $money and $phone
-    url = "http://localhost/stkpush.php"  # Assuming you're running the script locally
+    url = "http://localhost/darajaapi/stkpush.php"  # Replace with your actual URL
     data = {
         'money': money,
         'phone': phone_number
