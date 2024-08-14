@@ -1,66 +1,72 @@
 <?php
-// INCLUDE THE ACCESS TOKEN FILE
-include 'accessToken.php';
-date_default_timezone_set('Africa/Nairobi');
+//YOU MPESA API KEYS
+$consumerKey = "Qk3tJeARhJZB1VAAQc8oTUhPgxi8ipXYpsDpRYhbqBvtYX38"; //Fill with your app Consumer Key
+$consumerSecret = "EU6zoIBaWOykIRScpMEp0An8m6RQgyThl3AsgKFszUOm8TqDKiqu21CSJs9by3kl"; //Fill with your app Consumer Secret
+//ACCESS TOKEN URL
+$access_token_url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials';
+$headers = ['Authorization: Basic ' . base64_encode($consumerKey . ':' . $consumerSecret)];
+$ch = curl_init($access_token_url);
+curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
+curl_setopt($ch, CURLOPT_HEADER, FALSE);
+curl_setopt($ch, CURLOPT_USERPWD, $consumerKey . ':' . $consumerSecret);
+$result = curl_exec($ch);
+$result = json_decode($result);
+$access_token = $result->access_token;
+curl_close($ch);
 
-// Safaricom API URLs and keys
-$processrequestUrl = 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest';
-$callbackurl = 'https://1c95-105-161-14-223.ngrok-free.app/MPEsa-Daraja-Api/callback.php'; // Update with your callback URL
-$passkey = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
+// Shortcode (Paybill or Till Number)
 $BusinessShortCode = '174379';
-$Timestamp = date('YmdHis');
 
-// ENCRYPT DATA TO GET PASSWORD
-$Password = base64_encode($BusinessShortCode . $passkey . $Timestamp);
+// Get phone number and amount from the POST data
+$phone_number = $_POST['phone'];
+$amount = $_POST['money'];
 
-// Retrieve the money and phone values from the POST request
-$phone = $_POST['phone'];
-$money = $_POST['money'];
+// Lipa na Mpesa Online Passkey
+$LipaNaMpesaPasskey = 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919';
+$TransactionType = 'CustomerPayBillOnline';
 
-$PartyA = $phone;
-$PartyB = $_POST['phone'];
-$AccountReference = 'ERAMLINK NETWORKS';
-$TransactionDesc = 'stkpush test';
-$Amount = $money;
+// Timestamp
+$timestamp = date('YmdHis');
 
-$stkpushheader = ['Content-Type:application/json', 'Authorization:Bearer ' . $access_token];
+// Password
+$password = base64_encode($BusinessShortCode . $LipaNaMpesaPasskey . $timestamp);
 
-// INITIATE CURL
-$curl = curl_init();
-curl_setopt($curl, CURLOPT_URL, $processrequestUrl);
-curl_setopt($curl, CURLOPT_HTTPHEADER, $stkpushheader); // Setting custom header
-$curl_post_data = array(
-  // Fill in the request parameters with valid values
-  'BusinessShortCode' => $BusinessShortCode,
-  'Password' => $Password,
-  'Timestamp' => $Timestamp,
-  'TransactionType' => 'CustomerPayBillOnline',
-  'Amount' => $Amount,
-  'PartyA' => $PartyA,
-  'PartyB' => $BusinessShortCode,
-  'PhoneNumber' => $PartyA,
-  'CallBackURL' => $callbackurl,
-  'AccountReference' => $AccountReference,
-  'TransactionDesc' => $TransactionDesc
-);
+// Transaction details
+$PartyA = $phone_number; // Phone number sending money
+$PartyB = $BusinessShortCode; // Till number receiving the money
+$PhoneNumber = $phone_number; // Phone number to receive the STK push
+$CallBackURL = 'https://1c95-105-161-14-223.ngrok-free.app/MPEsa-Daraja-Api/callback.php'; // Replace with your callback URL
+$AccountReference = 'BingwaSokoni';
+$TransactionDesc = 'Bingwa Sokoni payment';
 
-$data_string = json_encode($curl_post_data);
-curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($curl, CURLOPT_POST, true);
-curl_setopt($curl, CURLOPT_POSTFIELDS, $data_string);
-$curl_response = curl_exec($curl);
+// Prepare the request data
+$data = [
+    'BusinessShortCode' => $BusinessShortCode,
+    'Password' => $password,
+    'Timestamp' => $timestamp,
+    'TransactionType' => $TransactionType,
+    'Amount' => $amount,
+    'PartyA' => $PartyA,
+    'PartyB' => $PartyB,
+    'PhoneNumber' => $PhoneNumber,
+    'CallBackURL' => $CallBackURL,
+    'AccountReference' => $AccountReference,
+    'TransactionDesc' => $TransactionDesc
+];
 
-// Debugging: Output the full response
-echo $curl_response;
+// Lipa na Mpesa Online API endpoint
+$api_url = 'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest';
 
-$data = json_decode($curl_response);
-$CheckoutRequestID = $data->CheckoutRequestID;
-$ResponseCode = $data->ResponseCode;
+// Send the request
+$ch = curl_init();
+curl_setopt($ch, CURLOPT_URL, $api_url);
+curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $access_token, 'Content-Type: application/json']);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
+curl_setopt($ch, CURLOPT_POST, TRUE);
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+$response = curl_exec($ch);
+curl_close($ch);
 
-if ($ResponseCode == "0") {
-  echo "The CheckoutRequestID for this transaction is: " . $CheckoutRequestID;
-} else {
-  echo "There was an error processing the request. Response: " . $curl_response;
-}
-
-curl_close($curl);
+echo $response;
+?>
