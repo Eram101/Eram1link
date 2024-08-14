@@ -109,7 +109,7 @@ def phone_number(update: Update, context: CallbackContext) -> int:
         CheckoutRequestID = response_data["CheckoutRequestID"]
         update.message.reply_text('Payment request sent! Please check your phone.')
         
-        # Schedule a job to check payment status after 60 seconds
+        # Schedule a job to check payment status after 25 seconds
         context.job_queue.run_once(
             check_payment_status, 
             25, 
