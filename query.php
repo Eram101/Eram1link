@@ -28,7 +28,7 @@ $BusinessShortCode = '174379';
 $timestamp = date('YmdHis');
 
 // Lipa na Mpesa Online Passkey
-$LipaNaMpesaPasskey = 'your_passkey';
+$LipaNaMpesaPasskey = 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919';
 
 // Password
 $password = base64_encode($BusinessShortCode . $LipaNaMpesaPasskey . $timestamp);
