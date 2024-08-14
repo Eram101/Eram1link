@@ -3,8 +3,11 @@ import json
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackContext, CallbackQueryHandler, MessageHandler, Filters, ConversationHandler
-import requests
 from dotenv import load_dotenv
+
+# Import functions from stkpush.py and query.py
+from stkpush import process_stkpush  # Replace with the actual function name
+from query import query_payment_status  # Updated function name
 
 # Load environment variables
 load_dotenv()
@@ -98,35 +101,26 @@ def phone_number(update: Update, context: CallbackContext) -> int:
     # Extract the amount from the selected offer
     money = selected_offer.split('@Ksh ')[1].split()[0]
 
-    # Send request to stkpush.php with the filled-in $money and $phone
-    url = "http://localhost/darajaapi/stkpush.php"  # Replace with your actual URL
-    data = {
-        'money': money,
-        'phone': phone_number
-    }
-    response = requests.post(url, data=data)
+    # Call the function from stkpush.py directly
+    response_data = process_stkpush(money, phone_number)
 
     # Provide feedback to the user
-    if response.status_code == 200:
-        response_data = response.json()
-        if response_data.get("ResponseCode") == "0":
-            CheckoutRequestID = response_data["CheckoutRequestID"]
-            update.message.reply_text('Payment request sent! Please check your phone.')
-            
-            # Schedule a job to check payment status after 60 seconds
-            context.job_queue.run_once(
-                check_payment_status, 
-                60, 
-                context={
-                    'chat_id': update.message.chat_id, 
-                    'CheckoutRequestID': CheckoutRequestID
-                }, 
-                name=str(update.message.chat_id)
-            )
-        else:
-            update.message.reply_text('Error initiating payment. Please try again.')
+    if response_data.get("ResponseCode") == "0":
+        CheckoutRequestID = response_data["CheckoutRequestID"]
+        update.message.reply_text('Payment request sent! Please check your phone.')
+        
+        # Schedule a job to check payment status after 60 seconds
+        context.job_queue.run_once(
+            check_payment_status, 
+            25, 
+            context={
+                'chat_id': update.message.chat_id, 
+                'CheckoutRequestID': CheckoutRequestID
+            }, 
+            name=str(update.message.chat_id)
+        )
     else:
-        update.message.reply_text('Error processing payment. Please try again.')
+        update.message.reply_text('Error initiating payment. Please try again.')
 
     return ConversationHandler.END
 
@@ -138,32 +132,22 @@ def check_payment_status(context: CallbackContext):
         context.bot.send_message(chat_id=chat_id, text="No payment to check.")
         return
 
-    # Query the payment status
-    url = "http://localhost/darajaapi/query.php"  # Replace with your actual URL
-    data = {
-        'CheckoutRequestID': CheckoutRequestID
-    }
-    response = requests.post(url, data=data)
+    # Call the function from query.py directly
+    response_data = query_payment_status(CheckoutRequestID)
 
-    if response.status_code == 200:
-        response_data = response.json()
+    # Log the full response data for debugging
+    logging.info(f"Payment status response: {response_data}")
 
-        # Log the full response data for debugging
-        logging.info(f"Payment status response: {response_data}")
+    result_code = response_data.get("ResultCode")
 
-        result_code = response_data.get("ResultCode")
-
-        if result_code == '0':
-            context.bot.send_message(chat_id=chat_id, text="Payment successful!")
-        elif result_code == '1032':
-            context.bot.send_message(chat_id=chat_id, text="Transaction canceled by user.")
-        elif result_code == '1037':
-            context.bot.send_message(chat_id=chat_id, text="Transaction timed out.")
-        else:
-            context.bot.send_message(chat_id=chat_id, text="Payment failed.")
+    if result_code == '0':
+        context.bot.send_message(chat_id=chat_id, text="Payment successful!")
+    elif result_code == '1032':
+        context.bot.send_message(chat_id= chat_id, text="Transaction canceled by user.")
+    elif result_code == '1037':
+        context.bot.send_message(chat_id=chat_id, text="Transaction timed out.")
     else:
-        logging.error(f"Error checking payment status: {response.text}")
-        context.bot.send_message(chat_id=chat_id, text="Error checking payment status.")
+        context.bot.send_message(chat_id=chat_id, text="Payment failed.")
         
 def cancel(update: Update, context: CallbackContext) -> int:
     update.message.reply_text('Session canceled. Thank you!')
