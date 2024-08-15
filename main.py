@@ -132,6 +132,7 @@ def phone_number(update: Update, context: CallbackContext) -> int:
 
 def check_payment_status(context: CallbackContext):
     chat_id = context.job.context['chat_id']
+    admin_chat_id = os.getenv('ADMIN_CHAT_ID')  # Retrieve admin chat ID from .env
     CheckoutRequestID = context.job.context['CheckoutRequestID']
     offer_type = context.job.context['offer_type']
     duration = context.job.context['duration']
@@ -151,25 +152,50 @@ def check_payment_status(context: CallbackContext):
     result_code = response_data.get("ResultCode")
 
     if result_code == '0':
-        context.bot.send_message(
-            chat_id=chat_id, 
-            text=(
-                f"Payment successful!\n"
-                f"Package: {selected_offer}\n"
-                f"Duration: {duration}\n"
-                f"Phone Number: {phone_number}\n"
-                f"Use Till {MPESA_SHORTCODE} for offline transactions\n"
-                f"======================\n"
-                f"Thank you!"
-            )
+        message = (
+            f"Payment successful!\n"
+            f"Package: {selected_offer}\n"
+            f"Duration: {duration}\n"
+            f"Phone Number: {phone_number}\n"
+            f"Use Till {MPESA_SHORTCODE} for offline transactions\n"
+            f"======================\n"
+            f"Thank you!"
         )
+        context.bot.send_message(chat_id=chat_id, text=message)
+        context.bot.send_message(chat_id=admin_chat_id, text=f"ADMIN COPY:\n{message}\nUser Phone Number: {phone_number}")
+
     elif result_code == '1032':
-        context.bot.send_message(chat_id=chat_id, text="Transaction canceled by user.")
+        message = (
+            f"Transaction canceled by user.\n"
+            f"Phone Number: {phone_number}"
+        )
+        context.bot.send_message(chat_id=chat_id, text=message)
+        context.bot.send_message(chat_id=admin_chat_id, text=f"ADMIN COPY:\n{message}")
+
     elif result_code == '1037':
-        context.bot.send_message(chat_id=chat_id, text="Transaction timed out.")
+        message = (
+            f"Transaction timed out.\n"
+            f"Phone Number: {phone_number}"
+        )
+        context.bot.send_message(chat_id=chat_id, text=message)
+        context.bot.send_message(chat_id=admin_chat_id, text=f"ADMIN COPY:\n{message}")
+
+    elif result_code == '1':  # Assuming '1' represents insufficient funds
+        message = (
+            f"Transaction failed due to insufficient funds.\n"
+            f"Phone Number: {phone_number}"
+        )
+        context.bot.send_message(chat_id=chat_id, text=message)
+        context.bot.send_message(chat_id=admin_chat_id, text=f"ADMIN COPY:\n{message}")
+
     else:
-        context.bot.send_message(chat_id=chat_id, text="Payment failed.")
-        
+        message = (
+            f"Payment failed.\n"
+            f"Phone Number: {phone_number}"
+        )
+        context.bot.send_message(chat_id=chat_id, text=message)
+        context.bot.send_message(chat_id=admin_chat_id, text=f"ADMIN COPY:\n{message}")
+
 def cancel(update: Update, context: CallbackContext) -> int:
     update.message.reply_text('Session canceled. Thank you!')
     return ConversationHandler.END
