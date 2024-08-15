@@ -88,7 +88,7 @@ def option_selection(update: Update, context: CallbackContext) -> int:
     selected_offer = offers[offer_type][duration]['details'][int(selected_index)]
     context.user_data['selected_offer'] = selected_offer
     query.edit_message_text(text=f'You selected the offer: {selected_offer}')
-    query.message.reply_text('Please enter your phone number in this format\n 254xxxxxxxxxx:')
+    query.message.reply_text('Please enter your phone number:')
     return PHONE
 
 def phone_number(update: Update, context: CallbackContext) -> int:
