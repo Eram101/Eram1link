@@ -93,6 +93,11 @@ def option_selection(update: Update, context: CallbackContext) -> int:
 
 def phone_number(update: Update, context: CallbackContext) -> int:
     phone_number = update.message.text
+
+    # Ensure the phone number starts with '254'
+    if not phone_number.startswith('254'):
+        phone_number = '254' + phone_number.lstrip('0')
+
     context.user_data['phone_number'] = phone_number
 
     offer_type = context.user_data['offer_type']
@@ -129,6 +134,7 @@ def phone_number(update: Update, context: CallbackContext) -> int:
         update.message.reply_text('Error initiating payment. Please try again.')
 
     return ConversationHandler.END
+
 
 def check_payment_status(context: CallbackContext):
     chat_id = context.job.context['chat_id']
