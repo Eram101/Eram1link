@@ -3,7 +3,7 @@ import json
 import logging
 import re
 import csv
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackContext, CallbackQueryHandler, MessageHandler, Filters, ConversationHandler
 from dotenv import load_dotenv
@@ -35,7 +35,7 @@ def init_csv():
     if not os.path.exists(CSV_FILE):
         with open(CSV_FILE, 'w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow(['phone', 'offer', 'duration', 'status', 'timestamp'])
+            writer.writerow(['phone', 'offer', 'duration', 'status', 'timestamp', 'amount'])
 
 init_csv()
 
@@ -45,10 +45,10 @@ def validate_phone_number(phone_number: str) -> bool:
     return pattern.match(phone_number) is not None
 
 # Function to insert a transaction record
-def insert_transaction(phone, offer, duration, status):
+def insert_transaction(phone, offer, duration, status, amount):
     with open(CSV_FILE, 'a', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow([phone, offer, duration, status, datetime.now()])
+        writer.writerow([phone, offer, duration, status, datetime.now(), amount])
 
 # Function to check rate limiting
 def check_rate_limit(phone):
@@ -146,7 +146,7 @@ def phone_number(update: Update, context: CallbackContext) -> int:
         return ConversationHandler.END
 
     # Extract the amount from the selected offer
-    money = selected_offer.split('@Ksh ')[1].split()[0]
+    money = int(selected_offer.split('@Ksh ')[1].split()[0])
 
     # Call the function from stkpush.py directly
     response_data = process_stkpush(money, phone_number)
@@ -156,7 +156,7 @@ def phone_number(update: Update, context: CallbackContext) -> int:
         CheckoutRequestID = response_data["CheckoutRequestID"]
         update.message.reply_text('Payment request sent! Please check your phone.')
         
-        # Schedule a job to check payment status after 25 seconds
+        # Schedule a job to check payment status after 35 seconds
         context.job_queue.run_once(
             check_payment_status, 
             35, 
@@ -167,12 +167,13 @@ def phone_number(update: Update, context: CallbackContext) -> int:
                 'duration': duration,
                 'selected_offer': selected_offer,
                 'phone_number': phone_number,
+                'amount': money,
             }, 
             name=str(update.message.chat_id)
         )
         
         # Insert the transaction into the CSV file
-        insert_transaction(phone_number, offer_type, duration, 'pending')
+        insert_transaction(phone_number, offer_type, duration, 'pending', money)
 
     else:
         update.message.reply_text('Error initiating payment. Please try again.')
@@ -187,65 +188,66 @@ def check_payment_status(context: CallbackContext):
     duration = context.job.context['duration']
     selected_offer = context.job.context['selected_offer']
     phone_number = context.job.context['phone_number']
+    amount = context.job.context['amount']
 
     if not CheckoutRequestID:
-        context.bot.send_message(chat_id=chat_id, text="No payment to check.")
+        context.bot.send_message(chat_id=chat_id, text='Payment query could not be processed due to missing CheckoutRequestID.')
         return
 
-    # Call the function from query.py directly
-    response_data = query_payment_status(CheckoutRequestID)
+    result = query_payment_status(CheckoutRequestID)  # Use query_payment_status function
 
-    # Log the full response data for debugging
-    logging.info(f"Payment status response: {response_data}")
-
-    result_code = response_data.get("ResultCode")
-
-    if result_code == '0':
-        message = (
-            f"Payment successful!\n"
-            f"Package: {selected_offer}\n"
-            f"Duration: {duration}\n"
-            f"Phone Number: {phone_number}\n"
-            f"Use Till {MPESA_SHORTCODE} for offline transactions\n"
-            f"======================\n"
-            f"Thank you!"
-        )
+    if result.get('ResultCode') == '0':
+        message = f"Payment successful!\nOffer: {offer_type}\nDuration: {duration}\nPhone Number: {phone_number}\nAmount: {amount} Ksh."
         context.bot.send_message(chat_id=chat_id, text=message)
-        context.bot.send_message(chat_id=admin_chat_id, text=f"ADMIN COPY:\n{message}\nUser Phone Number: {phone_number}")
+        insert_transaction(phone_number, offer_type, duration, 'successful', amount)
 
-        # Update the transaction status in the CSV file
-        insert_transaction(phone_number, offer_type, duration, 'successful')
+        # Notify admin
+        context.bot.send_message(chat_id=admin_chat_id, text=f"Admin Alert: {message}")
 
-    elif result_code == '1032':
-        message = (
-            f"Transaction canceled by user.\n"
-            f"Phone Number: {phone_number}"
-        )
+    elif result.get('ResultCode') == '1032':
+        message = f"Payment cancelled for offer: {offer_type} (Duration: {duration})."
         context.bot.send_message(chat_id=chat_id, text=message)
-        context.bot.send_message(chat_id=admin_chat_id, text=f"ADMIN COPY:\n{message}")
+        insert_transaction(phone_number, offer_type, duration, 'canceled', amount)
 
-        # Update the transaction status in the CSV file
-        insert_transaction(phone_number, offer_type, duration, 'canceled')
-
-    elif result_code == '1':
-        message = (
-            f"Payment failed or was not completed. Try again.\n"
-            f"Phone Number: {phone_number}"
-        )
-        context.bot.send_message(chat_id=chat_id, text=message)
-        context.bot.send_message(chat_id=admin_chat_id, text=f"ADMIN COPY:\n{message}")
-
-        # Update the transaction status in the CSV file
-        insert_transaction(phone_number, offer_type, duration, 'failed')
+        # Notify admin
+        context.bot.send_message(chat_id=admin_chat_id, text=f"Admin Alert: {message}")
 
     else:
-        context.bot.send_message(chat_id=chat_id, text="Unexpected error. Contact support.")
+        message = f"Payment failed for offer: {offer_type} (Duration: {duration})."
+        context.bot.send_message(chat_id=chat_id, text=message)
+        insert_transaction(phone_number, offer_type, duration, 'failed', amount)
 
-def cancel(update: Update, context: CallbackContext) -> int:
-    update.message.reply_text('Thank you! The session has been canceled.')
-    return ConversationHandler.END
+        # Notify admin
+        context.bot.send_message(chat_id=admin_chat_id, text=f"Admin Alert: {message}")
 
-# Conversation handler for the bot
+def send_csv_invoice(context: CallbackContext):
+    with open(CSV_FILE, 'r') as file:
+        reader = csv.DictReader(file)
+        successful = failed = canceled = total_amount = 0
+
+        for row in reader:
+            if row['status'] == 'successful':
+                successful += 1
+                total_amount += int(row['amount'])
+            elif row['status'] == 'failed':
+                failed += 1
+            elif row['status'] == 'canceled':
+                canceled += 1
+
+    message = (f"Daily Report:\n"
+               f"Successful transactions: {successful}\n"
+               f"Failed transactions: {failed}\n"
+               f"Canceled transactions: {canceled}\n"
+               f"Total amount earned: {total_amount} Ksh.\n")
+    context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=message)
+    context.bot.send_document(chat_id=ADMIN_CHAT_ID, document=open(CSV_FILE, 'rb'))
+
+    # Reset the CSV file
+    with open(CSV_FILE, 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['phone', 'offer', 'duration', 'status', 'timestamp', 'amount'])
+
+# Set up the ConversationHandler with the states OFFER, DURATION, PHONE
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler('start', start)],
     states={
@@ -254,11 +256,15 @@ conv_handler = ConversationHandler(
         SELECT_OFFER: [CallbackQueryHandler(option_selection)],
         PHONE: [MessageHandler(Filters.text & ~Filters.command, phone_number)],
     },
-    fallbacks=[CommandHandler('cancel', cancel)],
+    fallbacks=[CommandHandler('start', start)],
 )
 
 dispatcher.add_handler(conv_handler)
 
-# Start the bot
+# Schedule the daily CSV and invoice send at midnight
+job_queue = updater.job_queue
+job_queue.run_daily(send_csv_invoice, time(hour=0, minute=0, second=0))
+
+# Start the Bot
 updater.start_polling()
 updater.idle()
