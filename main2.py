@@ -7,10 +7,8 @@ from datetime import datetime, timedelta, time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackContext, CallbackQueryHandler, MessageHandler, Filters, ConversationHandler
 from dotenv import load_dotenv
-
-# Import functions from stkpush.py and query.py
-from stkpush import process_stkpush  # Replace with the actual function name
-from query import query_payment_status  # Updated function name
+from stkpush import process_stkpush  
+from query import query_payment_status  
 
 # Load environment variables
 load_dotenv()
@@ -45,10 +43,11 @@ def validate_phone_number(phone_number: str) -> bool:
     return pattern.match(phone_number) is not None
 
 # Function to insert a transaction record
-def insert_transaction(phone, offer, duration, status, amount):
+def insert_transaction(phone, offer, duration, status, amount=None):
     with open(CSV_FILE, 'a', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow([phone, offer, duration, status, datetime.now(), amount])
+        # Write with 'amount' field always included
+        writer.writerow([phone, offer, duration, status, datetime.now(), amount if amount else ''])
 
 # Function to check rate limiting
 def check_rate_limit(phone):
@@ -159,7 +158,7 @@ def phone_number(update: Update, context: CallbackContext) -> int:
         # Schedule a job to check payment status after 35 seconds
         context.job_queue.run_once(
             check_payment_status, 
-            35, 
+            30 , 
             context={
                 'chat_id': update.message.chat_id, 
                 'CheckoutRequestID': CheckoutRequestID,
@@ -202,36 +201,47 @@ def check_payment_status(context: CallbackContext):
         insert_transaction(phone_number, offer_type, duration, 'successful', amount)
 
         # Notify admin
-        context.bot.send_message(chat_id=admin_chat_id, text=f"Admin Alert: {message}")
+        context.bot.send_message(chat_id=admin_chat_id, text=f"Admin Alert:\n{message}")
 
     elif result.get('ResultCode') == '1032':
-        message = f"Payment cancelled for offer: {offer_type} (Duration: {duration})."
+        message = f"Payment cancelled for offer: {offer_type} (Duration: {duration}).\nPhone Number: {phone_number}"
         context.bot.send_message(chat_id=chat_id, text=message)
         insert_transaction(phone_number, offer_type, duration, 'canceled', amount)
 
         # Notify admin
-        context.bot.send_message(chat_id=admin_chat_id, text=f"Admin Alert: {message}")
+        context.bot.send_message(chat_id=admin_chat_id, text=f"Admin Alert:\n{message}")
 
     else:
-        message = f"Payment failed for offer: {offer_type} (Duration: {duration})."
+        message = f"Payment failed for offer: {offer_type} (Duration: {duration}).\nPhone Number: {phone_number}"
         context.bot.send_message(chat_id=chat_id, text=message)
         insert_transaction(phone_number, offer_type, duration, 'failed', amount)
 
         # Notify admin
-        context.bot.send_message(chat_id=admin_chat_id, text=f"Admin Alert: {message}")
+        context.bot.send_message(chat_id=admin_chat_id, text=f"Admin Alert:\n{message}")
 
 def send_csv_invoice(context: CallbackContext):
+    successful = failed = canceled = total_amount = 0
+    
     with open(CSV_FILE, 'r') as file:
-        reader = csv.DictReader(file)
-        successful = failed = canceled = total_amount = 0
-
+        reader = csv.reader(file)
+        header = next(reader)
+        
+        # Ensure the 'amount' field exists
+        if 'amount' not in header:
+            header.append('amount')
+        
         for row in reader:
-            if row['status'] == 'successful':
+            if len(row) < len(header):
+                row.append('')  # Add an empty field if 'amount' is missing
+
+            status = row[3]
+            amount = row[5] if len(row) > 5 else '0'
+            if status == 'successful':
                 successful += 1
-                total_amount += int(row['amount'])
-            elif row['status'] == 'failed':
+                total_amount += int(amount)
+            elif status == 'failed':
                 failed += 1
-            elif row['status'] == 'canceled':
+            elif status == 'canceled':
                 canceled += 1
 
     message = (f"Daily Report:\n"
@@ -239,6 +249,7 @@ def send_csv_invoice(context: CallbackContext):
                f"Failed transactions: {failed}\n"
                f"Canceled transactions: {canceled}\n"
                f"Total amount earned: {total_amount} Ksh.\n")
+    
     context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=message)
     context.bot.send_document(chat_id=ADMIN_CHAT_ID, document=open(CSV_FILE, 'rb'))
 
