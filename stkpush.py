@@ -17,6 +17,7 @@ lipa_na_mpesa_passkey = os.getenv("MPESA_PASSKEY")
 callback_url = os.getenv("MPESA_CALLBACK_URL")
 environment = os.getenv("MPESA_ENVIRONMENT")  # 'live' or 'sandbox'
 stkname = os.getenv('STK_NAME')
+till_number = os.getenv('TILL_NUMBER')
 
 # Define base URL based on environment
 base_url = 'https://api.safaricom.co.ke' if environment == 'live' else 'https://sandbox.safaricom.co.ke'
@@ -52,7 +53,7 @@ def process_stkpush(amount, phone_number):
         'TransactionType': 'CustomerPayBillOnline',  # Use 'CustomerPayBillOnline' for paybill/till numbers
         'Amount': amount,
         'PartyA': phone_number,
-        'PartyB': business_shortcode,  # Your M-Pesa till number
+        'PartyB': till_number,  # Your M-Pesa till number
         'PhoneNumber': phone_number,
         'CallBackURL': callback_url,
         'AccountReference': stkname,

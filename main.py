@@ -41,8 +41,10 @@ init_csv()
 
 # Function to validate phone number
 def validate_phone_number(phone_number: str) -> bool:
-    pattern = re.compile(r'^2547\d{8}$')
+    # This regular expression allows the number to start with 25401 or 25407 followed by 8 digits
+    pattern = re.compile(r'^254(7|1)\d{8}$')
     return pattern.match(phone_number) is not None
+
 
 # Function to insert a transaction record
 def insert_transaction(phone, offer, duration, status, amount=None):
@@ -157,7 +159,7 @@ def phone_number(update: Update, context: CallbackContext) -> int:
         CheckoutRequestID = response_data["CheckoutRequestID"]
         update.message.reply_text('Payment request sent! Please check your phone.')
         
-        # Schedule a job to check payment status after 35 seconds
+        # Schedule a job to check payment status after 30 seconds
         context.job_queue.run_once(
             check_payment_status, 
             30 , 
